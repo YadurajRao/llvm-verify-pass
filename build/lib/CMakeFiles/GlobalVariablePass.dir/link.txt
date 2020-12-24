@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -Wall    -fdiagnostics-color=always -fno-rtti -fvisibility-inlines-hidden -g  -shared -Wl,-soname,libGlobalVariablePass.so -o libGlobalVariablePass.so CMakeFiles/GlobalVariablePass.dir/GlobalVariablePass.cpp.o   -L/home/yaduraj/llvm-project/build/./lib 
