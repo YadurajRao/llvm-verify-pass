@@ -1,9 +1,13 @@
-#include "GlobalVariablePass.h"
+#include "SafetyVerificationPass.h"
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include "z3++.h"
+
+#include "Program.h"
+
 
 using namespace llvm;
 
@@ -72,7 +76,7 @@ void printCmpInstruction(Instruction& Inst, raw_ostream& OS) {
   op2->printAsOperand(OS, false);
 }
 
-void getGlobalVariables(Module& M, raw_ostream& OS) {
+void printGlobalVariables(Module& M, raw_ostream& OS) {
   OS << "GlobalVariables: \n";
   for (GlobalVariable& Gvar : M.globals()) {
     printTab(1, OS);
@@ -82,7 +86,7 @@ void getGlobalVariables(Module& M, raw_ostream& OS) {
   }
 }
 
-void getFunctionGraph(Module& M, raw_ostream& OS) {
+void printFunctionGraph(Module& M, raw_ostream& OS) {
   for (Function& Func : M) {
     std::string FuncName = Func.getName().str();
     if (FuncName.substr(0, 3) != "thr") continue;
@@ -126,20 +130,26 @@ void getFunctionGraph(Module& M, raw_ostream& OS) {
   }
 }
 
-PreservedAnalyses GlobalVariablePass::run(Module& M, ModuleAnalysisManager& AM) {
-  getGlobalVariables(M, OS);
-  getFunctionGraph(M, OS);
+bool test_bench(Module& M) {
+  Program program(M);
+  return false;
+}
+
+PreservedAnalyses SafetyVerificationPass::run(Module& M, ModuleAnalysisManager& AM) {
+  test_bench(M);
+  //getGlobalVariables(M, OS);
+  //getFunctionGraph(M, OS);
   return PreservedAnalyses::all();
 }
 
-llvm::PassPluginLibraryInfo getGlobalVariablePassPluginInfo() {
-  return {LLVM_PLUGIN_API_VERSION, "GlobalVariablePass", LLVM_VERSION_STRING,
+llvm::PassPluginLibraryInfo getSafetyVerificationPassPluginInfo() {
+  return {LLVM_PLUGIN_API_VERSION, "SafetyVerificationPass", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
                 [](StringRef Name, ModulePassManager &MPM,
                    ArrayRef<PassBuilder::PipelineElement>) {
-                  if (Name == "set-global-variables") {
-                    MPM.addPass(GlobalVariablePass(llvm::errs()));
+                  if (Name == "verify-module-safety") {
+                    MPM.addPass(SafetyVerificationPass(llvm::errs()));
                     return true;
                   }
                   return false;
@@ -149,5 +159,5 @@ llvm::PassPluginLibraryInfo getGlobalVariablePassPluginInfo() {
 
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
-  return getGlobalVariablePassPluginInfo();
+  return getSafetyVerificationPassPluginInfo();
 }

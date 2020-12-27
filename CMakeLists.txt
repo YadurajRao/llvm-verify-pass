@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.13.4)
 project(llvm-tutor)
 
 #===============================================================================
+# 1. Verify Z3 INSTALLATION DIR
+#===============================================================================
+# Set this to a valid Z3 installation dir
+
+find_package(Z3 REQUIRED CONFIG)
+message(STATUS "Found Z3 ${Z3_VERSION_MAJOR}")
+
+include_directories(SYSTEM ${Z3_CXX_INCLUDE_DIRS})
+link_libraries(${Z3_LIBRARIES})
+
+#===============================================================================
 # 1. VERIFY LLVM INSTALLATION DIR
 #===============================================================================
 # Set this to a valid LLVM installation dir

@@ -1,13 +1,13 @@
-#ifndef GLOBAL_VARIABLE_PASS_H_
-#define GLOBAL_VARIABLE_PASS_H_
+#ifndef SAFETY_VERIFICATION_PASS_H_
+#define SAFETY_VERIFICATION_PASS_H_
 
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
-class GlobalVariablePass : public llvm::PassInfoMixin<GlobalVariablePass> {
+class SafetyVerificationPass : public llvm::PassInfoMixin<SafetyVerificationPass> {
 public:
-  GlobalVariablePass(llvm::raw_ostream& _OS) : OS(_OS) {}
+  explicit SafetyVerificationPass(llvm::raw_ostream& _OS) : OS(_OS) {}
   llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager& AM);
 
 private:
