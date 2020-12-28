@@ -7,6 +7,7 @@ target triple = "x86_64-pc-linux-gnu"
 @flag2 = dso_local global i32 0, align 4
 @turn = common dso_local global i32 0, align 4
 @x = common dso_local global i32 0, align 4
+@temp = dso_local global i1 false, align 1
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local void @thr1() #0 {

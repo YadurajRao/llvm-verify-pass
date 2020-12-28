@@ -4,7 +4,7 @@ extern void __VERIFIER_error() __attribute__ ((__noreturn__));
    http://www.model.in.tum.de/~popeea/research/threader
 */
 
-#include <pthread.h>
+// #include <pthread.h>
 #define assert(e) if (!(e)) ERROR: __VERIFIER_error()
 
 int flag1 = 0, flag2 = 0; // boolean flags
