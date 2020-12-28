@@ -6,7 +6,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
-#include "llvm/Support/raw_ostream.h"
 #include "z3++.h"
 
 #define LOCAL_DEBUG
@@ -18,16 +17,12 @@ namespace {
 struct BasicBlockGraph {
   bool has_phi = false;
   std::vector<int> inst;
+  std::vector<int> branch_inst;
+  std::vector<int> branch_target;
   std::vector<int> phi_inst;
   std::vector<int> phi_inc_blocks;
   std::vector<z3::expr> phi_target_expr;
 };
-
-void printTab(int n) {
-  while (n--) {
-    std::cout << "  " << std::endl;
-  }
-}
 
 }
 
@@ -62,7 +57,7 @@ void Program::ParseGlobalVariables(Module& M) {
   }
 }
 
-void Program::ParseThread(Function& Func) {                                         // maps block name to its node number
+void Program::ParseThread(Function& Func) {                                     // maps block name to its node number
   std::string thread_name = Func.getName().str();
   thread_names_.push_back(thread_name);
   std::map<std::string, int> block_map;
@@ -80,6 +75,11 @@ void Program::ParseThread(Function& Func) {                                     
 
   int cur_block = 0;
   for (BasicBlock& BB : Func) {
+    BasicBlockGraph& bb_struct = bb_automata[cur_block++];
+#ifdef LOCAL_DEBUG
+    std::cout << "Entering Block " << ValueToVariable(&BB, thread_name);
+    std::cout << " now" << std::endl;
+#endif
     for (Instruction& Inst : BB) {
       switch (Inst.getOpcode()) {
         case Instruction::Call: {
@@ -97,21 +97,61 @@ void Program::ParseThread(Function& Func) {                                     
           break;
         }
         case Instruction::Br: {
+          BranchInst* br_inst = dyn_cast<BranchInst>(&Inst);
+          if (br_inst->isUnconditional()) {
+            inst_lval_operands_.push_back("assume");
+            z3::expr cond_expr = context_.bool_val(true);
+            bb_struct.branch_inst.push_back(static_cast<int>(inst_exprs_.size()));
+            inst_exprs_.push_back(cond_expr);
+            BasicBlock* bb_next = br_inst->getSuccessor(0);
+            std::string bb_name =
+                         ValueToVariable(dyn_cast<Value>(bb_next), thread_name);
+            std::map<std::string, int>::iterator iter = block_map.find(bb_name);
+            assert(iter != block_map.end());
+            bb_struct.branch_target.push_back(iter->second);
 #ifdef LOCAL_DEBUG
-          std::cout << "Entered Call Branch instruction: " << std::endl;
-          Inst.printAsOperand(llvm::errs(), false);
-          std::cout << std::endl;
-          for (Use& U : Inst.operands()) {
-            Value* v = U.get();
-            llvm::errs() << " ";
-            v->printAsOperand(llvm::errs(), false);
-          }
-          std::cout << std::endl;
+            std::cout << "Unconditional Branch Instruction to ";
+            std::cout << iter->second << " block" << std::endl;
 #endif
+          } else {
+            inst_lval_operands_.push_back("assume");
+            inst_lval_operands_.push_back("assume");
+            Value* v_cond = br_inst->getCondition();
+            z3::expr cond_expr =
+                        ValueToExpr(v_cond, thread_name) != context_.int_val(0);
+            bb_struct.branch_inst.push_back(static_cast<int>(inst_exprs_.size()));
+            inst_exprs_.push_back(cond_expr);
+            BasicBlock* bb_next = br_inst->getSuccessor(0);
+            std::string bb_name =
+                         ValueToVariable(dyn_cast<Value>(bb_next), thread_name);
+            std::map<std::string, int>::iterator iter = block_map.find(bb_name);
+            assert(iter != block_map.end());
+            bb_struct.branch_target.push_back(iter->second);
+#ifdef LOCAL_DEBUG
+            std::cout << "Conditional Branch Instruction" << std::endl;
+            std::cout << "If " << ValueToVariable(v_cond, thread_name);
+            std::cout << " then go to " << iter->second << " block" << std::endl;
+#endif
+            cond_expr = (cond_expr == context_.bool_val(false));
+            bb_struct.branch_inst.push_back(static_cast<int>(inst_exprs_.size()));
+            inst_exprs_.push_back(cond_expr);
+            bb_next = br_inst->getSuccessor(1);
+            bb_name = ValueToVariable(dyn_cast<Value>(bb_next), thread_name);
+            iter = block_map.find(bb_name);
+            assert(iter != block_map.end());
+            bb_struct.branch_target.push_back(iter->second);
+#ifdef LOCAL_DEBUG
+            std::cout << "If not " << ValueToVariable(v_cond, thread_name);
+            std::cout << " then go to " << iter->second << " block";
+            std::cout << std::endl;
+#endif
+          }
           break;
         }
         case Instruction::PHI: {
+          bb_struct.has_phi = true;
           std::string lval_operand = ValueToVariable(&Inst, thread_name);
+          AddVariable(lval_operand);
 #ifdef LOCAL_DEBUG
           std::cout << "Caught a PHI one here: " << std::endl;
           std::cout << lval_operand << std::endl;
@@ -120,8 +160,8 @@ void Program::ParseThread(Function& Func) {                                     
           for (Use& U : phi_node->incoming_values()) {
             Value* v = U.get();
             z3::expr v_expr = ValueToExpr(v, thread_name);
-            bb_automata[cur_block].phi_inst.push_back(static_cast<int>(inst_exprs_.size()));
-            bb_automata[cur_block].phi_target_expr.push_back(v_expr);
+            bb_struct.phi_inst.push_back(static_cast<int>(inst_exprs_.size()));
+            bb_struct.phi_target_expr.push_back(v_expr);
             inst_lval_operands_.push_back(lval_operand);
             inst_exprs_.push_back(v_expr);
 #ifdef LOCAL_DEBUG
@@ -135,7 +175,7 @@ void Program::ParseThread(Function& Func) {                                     
             std::string bb_name = ValueToVariable(inc_bb, thread_name);
             std::map<std::string, int>::iterator iter = block_map.find(bb_name);
             assert(iter != block_map.end());
-            bb_automata[cur_block].phi_inc_blocks.push_back(iter->second);
+            bb_struct.phi_inc_blocks.push_back(iter->second);
 #ifdef LOCAL_DEBUG
             std::cout << bb_name << " ";
 #endif
@@ -146,7 +186,7 @@ void Program::ParseThread(Function& Func) {                                     
           break;
         }
         case Instruction::Load: {
-          bb_automata[cur_block].inst.push_back(static_cast<int>(inst_exprs_.size()));
+          bb_struct.inst.push_back(static_cast<int>(inst_exprs_.size()));
           std::string lval_operand = ValueToVariable(&Inst, thread_name);
           AddVariable(lval_operand);
           inst_lval_operands_.push_back(lval_operand);
@@ -160,7 +200,7 @@ void Program::ParseThread(Function& Func) {                                     
           break;
         }
         case Instruction::Store: {
-          bb_automata[cur_block].inst.push_back(static_cast<int>(inst_exprs_.size()));
+          bb_struct.inst.push_back(static_cast<int>(inst_exprs_.size()));
           Value* lhs = Inst.getOperand(1);
           std::string lval_operand = ValueToVariable(lhs, thread_name);
           AddVariable(lval_operand);
@@ -178,7 +218,7 @@ void Program::ParseThread(Function& Func) {                                     
         case Instruction::Sub:
         case Instruction::Mul:
         case Instruction::ICmp: {
-          bb_automata[cur_block].inst.push_back(static_cast<int>(inst_exprs_.size()));
+          bb_struct.inst.push_back(static_cast<int>(inst_exprs_.size()));
           std::string lval_operand = ValueToVariable(&Inst, thread_name);
           AddVariable(lval_operand);
           inst_lval_operands_.push_back(lval_operand);
@@ -271,7 +311,6 @@ void Program::ParseThread(Function& Func) {                                     
         }
       }
     }
-    ++cur_block;
   }
 }
 
@@ -290,9 +329,6 @@ std::string Program::ValueToVariable(const Value* v, std::string scope) {
 
 z3::expr Program::ValueToExpr(const Value* v, std::string scope) {
   if (const ConstantInt* CI = dyn_cast<ConstantInt>(v)) {
-#ifdef LOCAL_DEBUG
-    std::cout << "An integer here: " << ValueToVariable(v, scope) << std::endl;
-#endif
     int64_t val = CI->getSExtValue();
     return context_.int_val(val);
   } else {
