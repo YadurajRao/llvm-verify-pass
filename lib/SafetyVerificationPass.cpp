@@ -137,9 +137,14 @@ bool test_bench(Module& M) {
 
 PreservedAnalyses SafetyVerificationPass::run(Module& M, ModuleAnalysisManager& AM) {
   test_bench(M);
-  //getGlobalVariables(M, OS);
-  //getFunctionGraph(M, OS);
+
   return PreservedAnalyses::all();
+}
+
+bool LegacySafetyVerificationPass::runOnModule(Module& M) {
+  test_bench(M);
+
+  return false;
 }
 
 llvm::PassPluginLibraryInfo getSafetyVerificationPassPluginInfo() {
@@ -161,3 +166,10 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
   return getSafetyVerificationPassPluginInfo();
 }
+
+char LegacySafetyVerificationPass::ID = 0;
+
+static RegisterPass<LegacySafetyVerificationPass> X("legacy-verify-module-safety",
+                                                    "Legacy Safety Verification Pass",
+                                                    true,
+                                                    false);

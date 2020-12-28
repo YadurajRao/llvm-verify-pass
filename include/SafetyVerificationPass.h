@@ -14,4 +14,10 @@ private:
   llvm::raw_ostream& OS;
 };
 
+struct LegacySafetyVerificationPass : public llvm::ModulePass {
+  static char ID;
+  LegacySafetyVerificationPass() : llvm::ModulePass(ID) {}
+  bool runOnModule(llvm::Module& M) override;
+};
+
 #endif
