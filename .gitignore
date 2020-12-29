@@ -33,4 +33,5 @@
 
 # Directories
 build/
+input/
 libfaudes-2_26g/
