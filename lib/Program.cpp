@@ -29,8 +29,7 @@ struct BasicBlockGraph {
   std::map<int, int> phi_aut_map;
 };
 
-std::vector<std::vector<std::pair<int, int> > > CreateAutGraph(
-                                              std::vector<BasicBlockGraph> BB) {
+adjacency_list<int> CreateAutGraph(std::vector<BasicBlockGraph> BB) {
   std::vector<std::vector<std::pair<int, int> > > aut_graph;
   // 0 is the start state
   // 1 is the accepting state
@@ -407,8 +406,7 @@ void Program::ParseThread(Function& Func) {                                     
     }
   }
 
-  std::vector<std::vector<std::pair<int, int> > > aut_graph =
-                                                    CreateAutGraph(bb_automata);
+  adjacency_list<int> aut_graph = CreateAutGraph(bb_automata);
   return;
 
 }
