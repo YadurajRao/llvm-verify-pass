@@ -72,7 +72,7 @@ std::vector<std::vector<std::pair<int, int> > > CreateAutGraph(
     int from = bb.last_nd;
     for (auto iter = bb.branch_map.begin(); iter != bb.branch_map.end(); iter++) {
       int to;
-      int target_block = iter->second;
+      BasicBlockGraph& target_block = BB[iter->second];
       if (target_block.is_accepting) {
         to = 1;
       } else if (!target_block.has_branch) {
@@ -85,8 +85,10 @@ std::vector<std::vector<std::pair<int, int> > > CreateAutGraph(
         to = iter->second;
       }
       aut_graph[from].push_back(
-        make_pair(to,
-                  /* Instruction Number*/iter->first);
+        std::make_pair(
+          to,
+          iter->first                                                           // Corresponding Instruction Number or Symbol
+        )
       );
     }
   }
@@ -408,7 +410,7 @@ void Program::ParseThread(Function& Func) {                                     
   std::vector<std::vector<std::pair<int, int> > > aut_graph =
                                                     CreateAutGraph(bb_automata);
   return;
-  
+
 }
 
 std::string Program::ValueToVariable(const Value* v, std::string scope) {
