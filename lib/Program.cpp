@@ -16,13 +16,82 @@ namespace {
 
 struct BasicBlockGraph {
   bool has_phi = false;
+  bool has_branch = false;
+  bool is_accepting = false;
+
+  int first_nd;
+  int last_nd;
+
   std::vector<int> inst;
-  std::vector<int> branch_inst;
-  std::vector<int> branch_target;
-  std::vector<int> phi_inst;
-  std::vector<int> phi_inc_blocks;
-  std::vector<z3::expr> phi_target_expr;
+  std::map<int, int> branch_map;
+  std::map<int, int> phi_map;
+
+  std::map<int, int> phi_aut_map;
 };
+
+std::vector<std::vector<std::pair<int, int> > > CreateAutGraph(
+                                              std::vector<BasicBlockGraph> BB) {
+  std::vector<std::vector<std::pair<int, int> > > aut_graph;
+  // 0 is the start state
+  // 1 is the accepting state
+  // 2 is a state which can never reach an accepting state
+  for (int i = 0; i < 3; i++) {
+    aut_graph.emplace_back();
+  }
+  for (BasicBlockGraph& bb : BB) {
+    if (bb.is_accepting || !bb.has_branch) continue;
+    bb.first_nd = static_cast<int>(aut_graph.size() + bb.phi_map.size());
+    for (auto iter = bb.phi_map.begin(); iter != bb.phi_map.end(); iter++) {
+      int phi_nd_num = static_cast<int>(aut_graph.size());
+      aut_graph.emplace_back();
+      aut_graph.back().push_back(
+        std::make_pair(
+          bb.first_nd,
+          iter->second
+        )
+      );
+      bb.phi_aut_map.insert(
+        std::make_pair(
+          iter->first,
+          phi_nd_num
+        )
+      );
+    }
+    aut_graph.emplace_back();
+    int prev_nd = bb.first_nd;
+    for (unsigned i = 0; i < bb.inst.size(); i++) {
+      int cur = static_cast<int>(aut_graph.size());
+      aut_graph[prev_nd].push_back(std::make_pair(cur, bb.inst[i]));
+      aut_graph.emplace_back();
+      prev_nd = cur;
+    }
+    bb.last_nd = prev_nd;
+  }
+  for (BasicBlockGraph& bb : BB) {
+    if (bb.is_accepting || !bb.has_branch) continue;
+    int from = bb.last_nd;
+    for (auto iter = bb.branch_map.begin(); iter != bb.branch_map.end(); iter++) {
+      int to;
+      int target_block = iter->second;
+      if (target_block.is_accepting) {
+        to = 1;
+      } else if (!target_block.has_branch) {
+        to = 2;
+      } else if (!target_block.has_phi) {
+        to = target_block.first_nd;
+      } else {
+        auto iter = target_block.phi_aut_map.find(from);
+        assert(iter != target_block.phi_aut_map.end());
+        to = iter->second;
+      }
+      aut_graph[from].push_back(
+        make_pair(to,
+                  /* Instruction Number*/iter->first);
+      );
+    }
+  }
+  return aut_graph;
+}
 
 }
 
@@ -34,7 +103,7 @@ Program::Program(Module& M) {
 }
 
 z3::expr Program::GetVariableExpr(std::string name) {
-  std::map<std::string, z3::expr>::iterator iter = variable_expr_map_.find(name);
+  auto iter = variable_expr_map_.find(name);
   assert(iter != variable_expr_map_.end());
   return iter->second;
 }
@@ -60,15 +129,13 @@ void Program::ParseGlobalVariables(Module& M) {
 void Program::ParseThread(Function& Func) {                                     // maps block name to its node number
   std::string thread_name = Func.getName().str();
   thread_names_.push_back(thread_name);
-  std::map<std::string, int> block_map;
   std::vector<BasicBlockGraph> bb_automata;
 #ifdef LOCAL_DEBUG
     std::cout << "parsing function named " << thread_name << " now" << std::endl;
 #endif
+  std::map<std::string, int> block_map;
   for (BasicBlock& BB : Func) {
     std::string block_name = ValueToVariable(&BB, thread_name);
-    // raw_string_ostream block_name_stream(block_name);
-    // BB.printAsOperand(block_name_stream, false);
     block_map.insert(make_pair(block_name, static_cast<int>(bb_automata.size())));
     bb_automata.emplace_back();
   }
@@ -83,32 +150,30 @@ void Program::ParseThread(Function& Func) {                                     
     for (Instruction& Inst : BB) {
       switch (Inst.getOpcode()) {
         case Instruction::Call: {
+          bb_struct.is_accepting = true;
 #ifdef LOCAL_DEBUG
-          std::cout << "Entered Call Branch instruction: " << std::endl;
-          Inst.printAsOperand(llvm::errs(), false);
-          std::cout << std::endl;
-          for (Use& U : Inst.operands()) {
-            Value* v = U.get();
-            llvm::errs() << " ";
-            v->printAsOperand(llvm::errs(), false);
-          }
-          std::cout << std::endl;
+          std::cout << "Accepting State Here" << std::endl;
 #endif
           break;
         }
         case Instruction::Br: {
+          bb_struct.has_branch = true;
           BranchInst* br_inst = dyn_cast<BranchInst>(&Inst);
           if (br_inst->isUnconditional()) {
             inst_lval_operands_.push_back("assume");
             z3::expr cond_expr = context_.bool_val(true);
-            bb_struct.branch_inst.push_back(static_cast<int>(inst_exprs_.size()));
-            inst_exprs_.push_back(cond_expr);
             BasicBlock* bb_next = br_inst->getSuccessor(0);
             std::string bb_name =
                          ValueToVariable(dyn_cast<Value>(bb_next), thread_name);
-            std::map<std::string, int>::iterator iter = block_map.find(bb_name);
+            auto iter = block_map.find(bb_name);
             assert(iter != block_map.end());
-            bb_struct.branch_target.push_back(iter->second);
+            bb_struct.branch_map.insert(
+              std::make_pair(
+                static_cast<int>(inst_exprs_.size()),
+                iter->second
+              )
+            );
+            inst_exprs_.push_back(cond_expr);
 #ifdef LOCAL_DEBUG
             std::cout << "Unconditional Branch Instruction to ";
             std::cout << iter->second << " block" << std::endl;
@@ -119,27 +184,35 @@ void Program::ParseThread(Function& Func) {                                     
             Value* v_cond = br_inst->getCondition();
             z3::expr cond_expr =
                         ValueToExpr(v_cond, thread_name) != context_.int_val(0);
-            bb_struct.branch_inst.push_back(static_cast<int>(inst_exprs_.size()));
-            inst_exprs_.push_back(cond_expr);
             BasicBlock* bb_next = br_inst->getSuccessor(0);
             std::string bb_name =
                          ValueToVariable(dyn_cast<Value>(bb_next), thread_name);
-            std::map<std::string, int>::iterator iter = block_map.find(bb_name);
+            auto iter = block_map.find(bb_name);
             assert(iter != block_map.end());
-            bb_struct.branch_target.push_back(iter->second);
+            bb_struct.branch_map.insert(
+              std::make_pair(
+                static_cast<int>(inst_exprs_.size()),
+                iter->second
+              )
+            );
+            inst_exprs_.push_back(cond_expr);
 #ifdef LOCAL_DEBUG
             std::cout << "Conditional Branch Instruction" << std::endl;
             std::cout << "If " << ValueToVariable(v_cond, thread_name);
             std::cout << " then go to " << iter->second << " block" << std::endl;
 #endif
             cond_expr = (cond_expr == context_.bool_val(false));
-            bb_struct.branch_inst.push_back(static_cast<int>(inst_exprs_.size()));
-            inst_exprs_.push_back(cond_expr);
             bb_next = br_inst->getSuccessor(1);
             bb_name = ValueToVariable(dyn_cast<Value>(bb_next), thread_name);
             iter = block_map.find(bb_name);
             assert(iter != block_map.end());
-            bb_struct.branch_target.push_back(iter->second);
+            bb_struct.branch_map.insert(
+              std::make_pair(
+                static_cast<int>(inst_exprs_.size()),
+                iter->second
+              )
+            );
+            inst_exprs_.push_back(cond_expr);
 #ifdef LOCAL_DEBUG
             std::cout << "If not " << ValueToVariable(v_cond, thread_name);
             std::cout << " then go to " << iter->second << " block";
@@ -157,11 +230,14 @@ void Program::ParseThread(Function& Func) {                                     
           std::cout << lval_operand << std::endl;
 #endif
           PHINode* phi_node = dyn_cast<PHINode>(&Inst);
+
+          std::vector<int> phi_inst_nums;
+          std::vector<int> phi_inc_blocks;
+
           for (Use& U : phi_node->incoming_values()) {
             Value* v = U.get();
             z3::expr v_expr = ValueToExpr(v, thread_name);
-            bb_struct.phi_inst.push_back(static_cast<int>(inst_exprs_.size()));
-            bb_struct.phi_target_expr.push_back(v_expr);
+            phi_inst_nums.push_back(static_cast<int>(inst_exprs_.size()));
             inst_lval_operands_.push_back(lval_operand);
             inst_exprs_.push_back(v_expr);
 #ifdef LOCAL_DEBUG
@@ -173,9 +249,9 @@ void Program::ParseThread(Function& Func) {                                     
 #endif
           for (BasicBlock* inc_bb : phi_node->blocks()) {
             std::string bb_name = ValueToVariable(inc_bb, thread_name);
-            std::map<std::string, int>::iterator iter = block_map.find(bb_name);
+            auto iter = block_map.find(bb_name);
             assert(iter != block_map.end());
-            bb_struct.phi_inc_blocks.push_back(iter->second);
+            phi_inc_blocks.push_back(iter->second);
 #ifdef LOCAL_DEBUG
             std::cout << bb_name << " ";
 #endif
@@ -183,6 +259,17 @@ void Program::ParseThread(Function& Func) {                                     
 #ifdef LOCAL_DEBUG
           std::cout << std::endl;
 #endif
+          for (unsigned i = 0; i < phi_inst_nums.size(); i++) {
+            auto iter = bb_struct.phi_map.find(phi_inc_blocks[i]);
+            if (iter == bb_struct.phi_map.end()) {
+              bb_struct.phi_map.insert(
+                std::make_pair(
+                  phi_inc_blocks[i],
+                  phi_inst_nums[i]
+                )
+              );
+            }
+          }
           break;
         }
         case Instruction::Load: {
@@ -304,14 +391,24 @@ void Program::ParseThread(Function& Func) {                                     
 #endif
           break;
         }
+        case Instruction::Alloca:
+        case Instruction::Unreachable:
+        case Instruction::Ret: {
+          break;
+        }
         default: {
 #ifdef LOCAL_DEBUG
-          std::cout << Inst.getOpcodeName() << std::endl;
+          std::cout << "Unhandled: " << Inst.getOpcodeName() << std::endl;
 #endif
         }
       }
     }
   }
+
+  std::vector<std::vector<std::pair<int, int> > > aut_graph =
+                                                    CreateAutGraph(bb_automata);
+  return;
+  
 }
 
 std::string Program::ValueToVariable(const Value* v, std::string scope) {
