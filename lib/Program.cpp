@@ -179,10 +179,25 @@ void Program::ParseThread(Function& Func) {
 #endif
           break;
         }
+        case Instruction::Ret: {
+          bb_struct.has_branch = true;
+          inst_types_.push_back(kAssume);
+          inst_lval_operands_.push_back("assume");
+          z3::expr cond_expr = context_.bool_val(true);
+          bb_struct.branch_map.insert(
+            std::make_pair(
+              static_cast<int>(inst_exprs_.size()),
+              0
+            )
+          );
+          inst_exprs_.push_back(cond_expr);
+          break;
+        }
         case Instruction::Br: {
           bb_struct.has_branch = true;
           BranchInst* br_inst = dyn_cast<BranchInst>(&Inst);
           if (br_inst->isUnconditional()) {
+            inst_types_.push_back(kAssume);
             inst_lval_operands_.push_back("assume");
             z3::expr cond_expr = context_.bool_val(true);
             BasicBlock* bb_next = br_inst->getSuccessor(0);
@@ -202,6 +217,8 @@ void Program::ParseThread(Function& Func) {
             std::cout << iter->second << " block" << std::endl;
 #endif
           } else {
+            inst_types_.push_back(kAssume);
+            inst_types_.push_back(kAssume);
             inst_lval_operands_.push_back("assume");
             inst_lval_operands_.push_back("assume");
             Value* v_cond = br_inst->getCondition();
@@ -262,6 +279,7 @@ void Program::ParseThread(Function& Func) {
             Value* v = U.get();
             z3::expr v_expr = ValueToExpr(v, thread_name);
             phi_inst_nums.push_back(static_cast<int>(inst_exprs_.size()));
+            inst_types_.push_back(kAssign);
             inst_lval_operands_.push_back(lval_operand);
             inst_exprs_.push_back(v_expr);
 #ifdef LOCAL_DEBUG
@@ -300,6 +318,7 @@ void Program::ParseThread(Function& Func) {
           bb_struct.inst.push_back(static_cast<int>(inst_exprs_.size()));
           std::string lval_operand = ValueToVariable(&Inst, thread_name);
           AddVariable(lval_operand);
+          inst_types_.push_back(kAssign);
           inst_lval_operands_.push_back(lval_operand);
           Value* rf_val = Inst.getOperand(0);
           z3::expr rhs_expr = ValueToExpr(rf_val, thread_name);
@@ -315,6 +334,7 @@ void Program::ParseThread(Function& Func) {
           Value* lhs = Inst.getOperand(1);
           std::string lval_operand = ValueToVariable(lhs, thread_name);
           AddVariable(lval_operand);
+          inst_types_.push_back(kAssign);
           inst_lval_operands_.push_back(lval_operand);
           Value* rhs = Inst.getOperand(0);
           z3::expr rhs_expr = ValueToExpr(rhs, thread_name);
@@ -332,6 +352,7 @@ void Program::ParseThread(Function& Func) {
           bb_struct.inst.push_back(static_cast<int>(inst_exprs_.size()));
           std::string lval_operand = ValueToVariable(&Inst, thread_name);
           AddVariable(lval_operand);
+          inst_types_.push_back(kAssign);
           inst_lval_operands_.push_back(lval_operand);
           Value* op1 = Inst.getOperand(0);
           Value* op2 = Inst.getOperand(1);
@@ -440,8 +461,7 @@ void Program::ParseThread(Function& Func) {
           break;
         }
         case Instruction::Alloca:
-        case Instruction::Unreachable:
-        case Instruction::Ret: {
+        case Instruction::Unreachable: {
           break;
         }
         default: {
@@ -452,6 +472,10 @@ void Program::ParseThread(Function& Func) {
       }
     }
   }
+
+  // A bit of sanity checking
+  assert(inst_types_.size() == inst_exprs_.size());
+  assert(inst_types_.size() == inst_lval_operands_.size());
 
   adjacency_list<int> aut_graph = CreateAutGraph(bb_automata);
   return;

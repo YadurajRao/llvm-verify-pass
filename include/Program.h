@@ -17,6 +17,11 @@
 template <typename T>
 using adjacency_list = std::vector<std::vector<std::pair<int, T> > >;
 
+enum InstType {
+  kAssign,
+  kAssume
+};
+
 /**
  * A program class as a representation of the llvm module
  *
@@ -68,6 +73,7 @@ class Program {
   // A vector of z3 expressions of all instructions. In case of assume
   // instruction this is a boolean z3 expression.
   std::vector<z3::expr> inst_exprs_;
+  std::vector<InstType> inst_types_;
 
   std::vector<std::string> thread_names_;
   std::vector<adjacency_list<int> > thread_graphs_;
