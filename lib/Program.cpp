@@ -14,6 +14,7 @@ using namespace llvm;
 
 namespace {
 
+// An intermediate representation of basic blocks before creating their automata
 struct BasicBlockGraph {
   bool has_phi = false;
   bool has_branch = false;
@@ -22,18 +23,21 @@ struct BasicBlockGraph {
   int first_nd;
   int last_nd;
 
+  // A vector of non phi and non branch instructions of block in order
   std::vector<int> inst;
+  // A map from assume instructions to their target blocks
   std::map<int, int> branch_map;
+  // A map from incoming blocks to their corresponding instruction
   std::map<int, int> phi_map;
-
+  // A map from incoming blocks to their target states
   std::map<int, int> phi_aut_map;
 };
 
 adjacency_list<int> CreateAutGraph(std::vector<BasicBlockGraph> BB) {
+  // Edges have integer labels for there corresponding instructions (symbols of
+  // our automata). In case of epsilon transitions this label is -1.
   std::vector<std::vector<std::pair<int, int> > > aut_graph;
-  // 0 is the start state
-  // 1 is the accepting state
-  // 2 is a state which can never reach an accepting state
+  // 0 is the start state, 1 is the accepting state and 2 is a dead state
   for (int i = 0; i < 3; i++) {
     aut_graph.emplace_back();
   }
@@ -86,7 +90,7 @@ adjacency_list<int> CreateAutGraph(std::vector<BasicBlockGraph> BB) {
       aut_graph[from].push_back(
         std::make_pair(
           to,
-          iter->first                                                           // Corresponding Instruction Number or Symbol
+          iter->first
         )
       );
     }
@@ -127,7 +131,7 @@ void Program::ParseGlobalVariables(Module& M) {
   }
 }
 
-void Program::ParseThread(Function& Func) {                                     // maps block name to its node number
+void Program::ParseThread(Function& Func) {
   std::string thread_name = Func.getName().str();
   thread_names_.push_back(thread_name);
   std::vector<BasicBlockGraph> bb_automata;
@@ -137,10 +141,14 @@ void Program::ParseThread(Function& Func) {                                     
   std::map<std::string, int> block_map;
   for (BasicBlock& BB : Func) {
     std::string block_name = ValueToVariable(&BB, thread_name);
-    block_map.insert(make_pair(block_name, static_cast<int>(bb_automata.size())));
+    block_map.insert(
+      std::make_pair(
+        block_name,
+        static_cast<int>(bb_automata.size())
+      )
+    );
     bb_automata.emplace_back();
   }
-
   int cur_block = 0;
   for (BasicBlock& BB : Func) {
     BasicBlockGraph& bb_struct = bb_automata[cur_block++];
@@ -200,7 +208,8 @@ void Program::ParseThread(Function& Func) {                                     
 #ifdef LOCAL_DEBUG
             std::cout << "Conditional Branch Instruction" << std::endl;
             std::cout << "If " << ValueToVariable(v_cond, thread_name);
-            std::cout << " then go to " << iter->second << " block" << std::endl;
+            std::cout << " then go to " << iter->second << " block";
+            std::cout << std::endl;
 #endif
             cond_expr = (cond_expr == context_.bool_val(false));
             bb_next = br_inst->getSuccessor(1);
@@ -341,37 +350,61 @@ void Program::ParseThread(Function& Func) {                                     
               CmpInst* cmpInst = dyn_cast<CmpInst>(&Inst);
               switch (cmpInst->getPredicate()) {
                 case CmpInst::ICMP_EQ:
-                  rhs_expr = z3::ite(op1_expr == op2_expr, context_.int_val(1), context_.int_val(0));
+                  rhs_expr = z3::ite(
+                                    op1_expr == op2_expr,
+                                    context_.int_val(1),
+                                    context_.int_val(0)
+                                    );
 #ifdef LOCAL_DEBUG
                   std::cout << "== ";
 #endif
                   break;
                 case CmpInst::ICMP_NE:
-                  rhs_expr = z3::ite(op1_expr != op2_expr, context_.int_val(1), context_.int_val(0));
+                  rhs_expr = z3::ite(
+                                    op1_expr != op2_expr,
+                                    context_.int_val(1),
+                                    context_.int_val(0)
+                                    );
 #ifdef LOCAL_DEBUG
                   std::cout << "!= ";
 #endif
                   break;
                 case CmpInst::ICMP_SGT:
-                  rhs_expr = z3::ite(op1_expr > op2_expr, context_.int_val(1), context_.int_val(0));
+                  rhs_expr = z3::ite(
+                                    op1_expr > op2_expr,
+                                    context_.int_val(1),
+                                    context_.int_val(0)
+                                    );
 #ifdef LOCAL_DEBUG
                   std::cout << "> ";
 #endif
                   break;
                 case CmpInst::ICMP_SGE:
-                  rhs_expr = z3::ite(op1_expr >= op2_expr, context_.int_val(1), context_.int_val(0));
+                  rhs_expr = z3::ite(
+                                    op1_expr >= op2_expr,
+                                    context_.int_val(1),
+                                    context_.int_val(0)
+                                    );
 #ifdef LOCAL_DEBUG
                   std::cout << ">= ";
 #endif
                   break;
                 case CmpInst::ICMP_SLT:
-                  rhs_expr = z3::ite(op1_expr < op2_expr, context_.int_val(1), context_.int_val(0));
+                  rhs_expr = z3::ite(
+                                    op1_expr < op2_expr,
+                                    context_.int_val(1),
+                                    context_.int_val(0)
+                                    );
 #ifdef LOCAL_DEBUG
                   std::cout << "< ";
 #endif
                   break;
                 case CmpInst::ICMP_SLE:
-                  rhs_expr = z3::ite(op1_expr <= op2_expr, context_.int_val(1), context_.int_val(0));
+                  rhs_expr = z3::ite(
+                                    op1_expr <= op2_expr,
+                                    context_.int_val(1),
+                                    context_.int_val(0)
+                                    );
 #ifdef LOCAL_DEBUG
                   std::cout << "<= ";
 #endif
