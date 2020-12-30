@@ -12,7 +12,7 @@ message(STATUS "Using Z3.cmake")
 
 message("Z3Prover STATUS:
   Includes    ${Z3_CXX_INCLUDE_DIRS}
-  Libraries   ${Z3_LIBRARIES}
+  Libraries   ${Z3_LIBRARIES}"
 )
 
 include_directories(SYSTEM ${Z3_CXX_INCLUDE_DIRS})

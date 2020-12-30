@@ -70,7 +70,8 @@ adjacency_list<int> CreateAutGraph(std::vector<BasicBlockGraph> BB) {
     }
     bb.last_nd = prev_nd;
   }
-  for (BasicBlockGraph& bb : BB) {
+  for (unsigned i = 0; i < BB.size(); i++) {
+    BasicBlockGraph& bb = BB[i];
     if (bb.is_accepting || !bb.has_branch) continue;
     int from = bb.last_nd;
     for (auto iter = bb.branch_map.begin(); iter != bb.branch_map.end(); iter++) {
@@ -83,9 +84,9 @@ adjacency_list<int> CreateAutGraph(std::vector<BasicBlockGraph> BB) {
       } else if (!target_block.has_phi) {
         to = target_block.first_nd;
       } else {
-        auto iter = target_block.phi_aut_map.find(from);
-        assert(iter != target_block.phi_aut_map.end());
-        to = iter->second;
+        auto iter2 = target_block.phi_aut_map.find(i);
+        assert(iter2 != target_block.phi_aut_map.end());
+        to = iter2->second;
       }
       aut_graph[from].push_back(
         std::make_pair(
@@ -95,6 +96,18 @@ adjacency_list<int> CreateAutGraph(std::vector<BasicBlockGraph> BB) {
       );
     }
   }
+  assert(!BB[0].has_phi);
+  aut_graph[0].push_back(std::make_pair(BB[0].first_nd, -1));
+#ifdef LOCAL_DEBUG
+  for (unsigned i = 0; i < aut_graph.size(); i++) {
+    std::cout << "From State " << i << " :" << std::endl;
+    for (unsigned j = 0; j < aut_graph[i].size(); j++) {
+      std::cout << aut_graph[i][j].first << ' ' << aut_graph[i][j].second;
+      std::cout << std::endl;
+    }
+    std::cout << std::endl;
+  }
+#endif
   return aut_graph;
 }
 
@@ -133,6 +146,7 @@ void Program::ParseGlobalVariables(Module& M) {
 
 void Program::ParseThread(Function& Func) {
   std::string thread_name = Func.getName().str();
+  if (thread_name == "__ASSERT") return;
   thread_names_.push_back(thread_name);
   std::vector<BasicBlockGraph> bb_automata;
 #ifdef LOCAL_DEBUG
