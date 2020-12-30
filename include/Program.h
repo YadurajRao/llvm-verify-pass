@@ -47,7 +47,7 @@ class Program {
   explicit Program(llvm::Module& M);
 
   /**
-   * A method that takes a variable as string and returns its corresponding z3 expression.
+   * A method that takes a variable as string and returns its z3 expression.
    *
    * @param name Name of the variable to convert
    * @return z3 expression corresponding to the variable
@@ -78,7 +78,7 @@ class Program {
   // Returns a distinct string name for an llvm Value in function named scope
   std::string ValueToVariable(const llvm::Value*, std::string scope);
 
-  // Returns the z3 expression corresponding for an llvm Value
+  // Returns the z3 expression corresponding to an llvm Value
   z3::expr ValueToExpr(const llvm::Value*, std::string scope);
 
   bool AddVariable(std::string name);

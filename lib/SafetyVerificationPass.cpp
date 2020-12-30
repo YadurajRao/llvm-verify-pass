@@ -39,7 +39,8 @@ llvm::PassPluginLibraryInfo getSafetyVerificationPassPluginInfo() {
                   }
                   return false;
                 });
-          }};
+          }
+        };
 }
 
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo

@@ -1,44 +1,27 @@
 cmake_minimum_required(VERSION 3.13.4)
-project(llvm-tutor)
+project(llvm-simplify-pass)
 
 #===============================================================================
-# 1. Verify Z3 INSTALLATION DIR
+# 1. LOAD Z3 CONFIGURATION
 #===============================================================================
-# Set this to a valid Z3 installation dir
-
 find_package(Z3 REQUIRED CONFIG)
-message(STATUS "Found Z3 ${Z3_VERSION_MAJOR}")
+message(STATUS
+  "Found Z3 ${Z3_VERSION_MAJOR}.${Z3_VERSION_MINOR}.${Z3_VERSION_PATCH}"
+)
+message(STATUS "Using Z3.cmake")
+
+message("Z3Prover STATUS:
+  Includes    ${Z3_CXX_INCLUDE_DIRS}
+  Libraries   ${Z3_LIBRARIES}"
+)
 
 include_directories(SYSTEM ${Z3_CXX_INCLUDE_DIRS})
 link_libraries(${Z3_LIBRARIES})
 
 #===============================================================================
-# 1. VERIFY LLVM INSTALLATION DIR
-#===============================================================================
-# Set this to a valid LLVM installation dir
-set(LT_LLVM_INSTALL_DIR "" CACHE PATH "LLVM installation directory")
-
-# A bit of a sanity checking
-set(LT_LLVM_INCLUDE_DIR "/home/yaduraj/llvm-project/llvm/include/llvm")
-if(NOT EXISTS "${LT_LLVM_INCLUDE_DIR}")
-message(FATAL_ERROR
-  " LT_LLVM_INSTALL_DIR (${LT_LLVM_INCLUDE_DIR}) is invalid.")
-endif()
-
-set(LT_LLVM_CMAKE_FILE "/home/yaduraj/llvm-project/build/lib/cmake/llvm/LLVMConfig.cmake")
-if(NOT EXISTS "${LT_LLVM_CMAKE_FILE}")
-message(FATAL_ERROR
-    " LT_LLVM_CMAKE_FILE (${LT_LLVM_CMAKE_FILE}) is invalid.")
-endif()
-
-#===============================================================================
 # 2. LOAD LLVM CONFIGURATION
 #    For more: http://llvm.org/docs/CMake.html#embedding-llvm-in-your-project
 #===============================================================================
-# Add the location of LLVMConfig.cmake to CMake search paths (so that
-# find_package can locate it)
-list(APPEND CMAKE_PREFIX_PATH "/home/yaduraj/llvm-project/build/lib/cmake/llvm/")
-
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LT_LLVM_INSTALL_DIR}")
@@ -56,7 +39,7 @@ link_directories(${LLVM_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
 #===============================================================================
-# 3. LLVM-TUTOR BUILD CONFIGURATION
+# 3. LLVM-SIMPLIFY-PASS BUILD CONFIGURATION
 #===============================================================================
 # Use the same C++ standard as LLVM does
 set(CMAKE_CXX_STANDARD 14 CACHE STRING "")
@@ -77,10 +60,12 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 # -fvisibility-inlines-hidden is set when building LLVM and on Darwin warnings
-# are triggered if llvm-tutor is built without this flag (though otherwise it
-# builds fine). For consistency, add it here too.
+# are triggered if llvm-simplify-pass is built without this flag
+# (though otherwise it builds fine). For consistency, add it here too.
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-fvisibility-inlines-hidden" SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
+check_cxx_compiler_flag(
+  "-fvisibility-inlines-hidden" SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG
+)
 if (${SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG} EQUAL "1")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility-inlines-hidden")
 endif()
@@ -95,6 +80,3 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 # available for the sub-projects.
 #===============================================================================
 add_subdirectory(lib)
-# add_subdirectory(tools)
-# add_subdirectory(test)
-# add_subdirectory(HelloWorld)
