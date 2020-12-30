@@ -143,7 +143,7 @@ clang -emit-llvm -S input_file.c > output_file.ll
 clang -emit-llvm -o input_file.c > output_file.bc
 ```
 
-#### Running the pass through opt
+### Running the pass through opt
 ```bash
 # Run the pass through opt - Legacy PM
 opt -disable-output -load <build_dir>/lib/libSafetyVerificationPass.so -legacy-verify-module-safety input_for_legacy_pm.bc
