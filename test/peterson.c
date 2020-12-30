@@ -1,4 +1,4 @@
-void __ASSERT() {return;}
+void __ASSERT() {}
 
 /* Testcase from Threader's distribution. For details see:
    http://www.model.in.tum.de/~popeea/research/threader
@@ -8,8 +8,8 @@ void __ASSERT() {return;}
 #define assert(e) if (!(e)) __ASSERT()
 
 int flag1 = 0, flag2 = 0; // boolean flags
-int turn; // integer variable to hold the ID of the thread whose turn is it
-int x; // boolean variable to test mutual exclusion
+int turn = 0; // integer variable to hold the ID of the thread whose turn is it
+int x = 0; // boolean variable to test mutual exclusion
 
 void thr1() {
   flag1 = 1;
