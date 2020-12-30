@@ -17,6 +17,8 @@
 template <typename T>
 using adjacency_list = std::vector<std::vector<std::pair<int, T> > >;
 
+/// An enum type for Instruction types. Instruction fall into either assign or
+/// assume types.
 enum InstType {
   kAssign,
   kAssume
@@ -55,9 +57,17 @@ class Program {
    * A method that takes a variable as string and returns its z3 expression.
    *
    * @param name Name of the variable to convert
-   * @return z3 expression corresponding to the variable
+   * @return reference to z3 expression corresponding to the variable
    */
-  z3::expr GetVariableExpr(std::string name);
+  z3::expr& GetVariableExpr(std::string name);
+
+  /**
+   * A method that takes a global variable and return its initializer expr.
+   *
+   * @param name Name of the global variable
+   * @return z3 expression of its initializer
+   */
+  z3::expr GetGlobalInit(std::string name);
 
  private:
   z3::context context_;

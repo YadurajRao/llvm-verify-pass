@@ -1,3 +1,10 @@
+/**
+ * @file SafetyVerificationPass.cpp
+ *
+ * @brief Implements New PM and Legacy PM registeration and Test Bench
+ *
+ * @author Yaduraj Rao
+ */
 #include "SafetyVerificationPass.h"
 
 #include "llvm/IR/IRBuilder.h"
@@ -10,6 +17,9 @@
 
 using namespace llvm;
 
+//------------------------------------------------------------------------------
+// Test Bench implementation
+//------------------------------------------------------------------------------
 bool test_bench(Module& M) {
   Program program(M);
   return false;
@@ -27,6 +37,9 @@ bool LegacySafetyVerificationPass::runOnModule(Module& M) {
   return false;
 }
 
+//------------------------------------------------------------------------------
+// New PM Registeration
+//------------------------------------------------------------------------------
 llvm::PassPluginLibraryInfo getSafetyVerificationPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "SafetyVerificationPass", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
@@ -48,6 +61,9 @@ llvmGetPassPluginInfo() {
   return getSafetyVerificationPassPluginInfo();
 }
 
+//------------------------------------------------------------------------------
+// Legacy PM Registeration
+//------------------------------------------------------------------------------
 char LegacySafetyVerificationPass::ID = 0;
 
 static RegisterPass<LegacySafetyVerificationPass> X("legacy-verify-module-safety",
