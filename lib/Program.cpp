@@ -130,7 +130,7 @@ Program::Program(Module& M) {
 z3::expr& Program::GetVariableExpr(std::string name) {
   auto iter = variable_expr_map_.find(name);
   assert(iter != variable_expr_map_.end());
-  return &(iter->second);
+  return iter->second;
 }
 
 z3::expr Program::GetGlobalInit(std::string name) {
