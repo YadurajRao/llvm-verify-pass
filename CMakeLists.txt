@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13.4)
-project(llvm-simplify-pass)
+project(llvm-verify-pass)
 
 #===============================================================================
 # 1. LOAD Z3 CONFIGURATION
@@ -39,7 +39,7 @@ link_directories(${LLVM_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
 #===============================================================================
-# 3. LLVM-SIMPLIFY-PASS BUILD CONFIGURATION
+# 3. LLVM-VERIFY-PASS BUILD CONFIGURATION
 #===============================================================================
 # Use the same C++ standard as LLVM does
 set(CMAKE_CXX_STANDARD 14 CACHE STRING "")
@@ -60,7 +60,7 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 # -fvisibility-inlines-hidden is set when building LLVM and on Darwin warnings
-# are triggered if llvm-simplify-pass is built without this flag
+# are triggered if llvm-verify-pass is built without this flag
 # (though otherwise it builds fine). For consistency, add it here too.
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag(
