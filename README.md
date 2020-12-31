@@ -1,8 +1,8 @@
 # llvm-verify-pass
 # Development Environment
 ## Platform Support and Requirements
-This project has been tested on **Ubuntu 20.04**. In order to build this project
-you will need:
+This project is currently incomplete. Currently, this project has been tested
+on **Ubuntu 20.04**. In order to build this project you will need:
   * LLVM 11 or higher
   * Z3prover
   * C++ compiler with C++ 14 support
