@@ -1,4 +1,4 @@
-# llvm-simplify-pass
+# llvm-verify-pass
 # Development Environment
 ## Platform Support and Requirements
 This project has been tested on **Ubuntu 20.04**. In order to build this project
@@ -42,7 +42,7 @@ For further details read the [official documentation](https://github.com/Z3Prove
 
 # Building the project
 ## Building
-You can build **llvm-simplify-pass** as follows:
+You can build **llvm-verify-pass** as follows:
 ```bash
 mkdir <build/dir>
 cd <build/dir>
